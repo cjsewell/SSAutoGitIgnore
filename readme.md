@@ -1,15 +1,17 @@
-# SilverStripe Auto Git Ignore
-A Composer post-update-cmd script to automatically add Composer managed SilverStripe modules and themes to .gitignore
+# Wordpress Auto Git Ignore
+A Composer post-update-cmd script to automatically add Composer managed Wordpress plugins and themes to .gitignore  
+
+See [WordPress Packagist](https://wpackagist.org/) for more information about managing Wordpress plugins and themes with Composer
 
 ## Installation
 ### Add it to your project with:
 ```shell
-composer require gdmedia/ss-auto-git-ignore
+composer require cjsewell/wp-auto-git-ignore
 ```
 ### Add the following to your composer.json
 ```json
 "scripts": {
-     "post-update-cmd": "GDM\\SSAutoGitIgnore\\UpdateScript::Go"
+     "post-update-cmd": "GDM\\WPAutoGitIgnore\\UpdateIgnore::Go"
 }
 ```
 

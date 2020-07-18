@@ -1,8 +1,14 @@
 <?php
 
-namespace GDM\SSAutoGitIgnore;
+namespace GDM\WPAutoGitIgnore;
 
-class GitIgnoreEditor {
+use GDM\WPAutoGitIgnore\Errors\AutoGitIgnoreInvalidParameterException;
+use GDM\WPAutoGitIgnore\Errors\AutoGitIgnoreParseException;
+use GDM\WPAutoGitIgnore\Errors\AutoGitIgnorePermissionException;
+use GDM\WPAutoGitIgnore\Errors\AutoGitIgnoreSaveFailedException;
+
+class GitIgnoreEditor
+{
 
     /**
      * Git comment marking the start of auto generated lines
@@ -23,14 +29,14 @@ class GitIgnoreEditor {
      *
      * @var string
      */
-    private $filePath = ".gitignore";
+    private $filePath;
 
     /**
      * Array containing all lines in the current .gitgnore file
      *
      * @var array
      */
-    private $readLines = array();
+    private $readLines = [];
 
     /**
      * Total number of lines in the current .gitgnore file
@@ -58,23 +64,32 @@ class GitIgnoreEditor {
      *
      * @var array
      */
-    private $beforeLines = array();
+    private $beforeLines = [];
 
     /**
      * All lines found in $readLines before between $startMarker and $endMarker
      *
      * @var array
      */
-    private $autoLines = array();
+    private $autoLines = [];
 
     /**
      * All lines found in $readLines after $endMaker
      *
      * @var array
      */
-    private $afterLines = array();
+    private $afterLines = [];
 
-    public function __construct($ignoreFilePath = ".gitignore") {
+    /**
+     * GitIgnoreEditor constructor.
+     *
+     * @param string $ignoreFilePath
+     *
+     * @throws AutoGitIgnoreParseException
+     * @throws AutoGitIgnorePermissionException
+     */
+    public function __construct($ignoreFilePath = ".gitignore")
+    {
         $this->filePath = $ignoreFilePath;
         $this->CheckGitIgnore();
         $this->parse();
@@ -84,20 +99,21 @@ class GitIgnoreEditor {
      * Loads the current .gitignore and parses it.
      * Overwites/resets any unsaved changes
      *
-     * @throws AutoGitIgnoreParseException
      * @return self
+     * @throws AutoGitIgnoreParseException
      */
-    public function parse() {
+    public function parse()
+    {
         $this->readLines = file($this->filePath, FILE_IGNORE_NEW_LINES);
-        if (in_array($this->startMarker, $this->readLines) && !in_array($this->endMarker, $this->readLines)) {
-            throw new AutoGitIgnoreParseException("Found start marker on line " . ($this->findStartIndex() + 1) . " without an end marker. Please manually edit " . $this->filePath);
-        } else if (in_array($this->endMarker, $this->readLines) && !in_array($this->startMarker, $this->readLines)) {
-            throw new AutoGitIgnoreParseException("Found end marker on line " . ( $this->findEndIndex() + 1) . " without a start marker. Please manually edit " . $this->filePath);
+        if (in_array($this->startMarker, $this->readLines) && ! in_array($this->endMarker, $this->readLines)) {
+            throw new AutoGitIgnoreParseException("Found start marker on line " . ( $this->findStartIndex() + 1 ) . " without an end marker. Please manually edit " . $this->filePath);
+        } elseif (in_array($this->endMarker, $this->readLines) && ! in_array($this->startMarker, $this->readLines)) {
+            throw new AutoGitIgnoreParseException("Found end marker on line " . ( $this->findEndIndex() + 1 ) . " without a start marker. Please manually edit " . $this->filePath);
         }
         $this->startIndex = $this->findStartIndex();
         $this->endIndex   = $this->findEndIndex();
         if ($this->endIndex < $this->startIndex) {
-            throw new AutoGitIgnoreParseException("End marker found on line " . ($this->endIndex + 1) . " before start maker on line " . ($this->startIndex + 1) . ". Please manually edit " . $this->filePath);
+            throw new AutoGitIgnoreParseException("End marker found on line " . ( $this->endIndex + 1 ) . " before start maker on line " . ( $this->startIndex + 1 ) . ". Please manually edit " . $this->filePath);
         }
 
         $this->numLines = count($this->readLines);
@@ -105,7 +121,7 @@ class GitIgnoreEditor {
         if ($this->startIndex === false) {
             $this->startIndex = $this->numLines + 1;
         }
-        if ($this->startIndex != 0) {
+        if ($this->startIndex !== 0) {
             $this->beforeLines = array_slice($this->readLines, 0, $this->startIndex);
         }
         if ($this->endIndex === false) {
@@ -122,24 +138,27 @@ class GitIgnoreEditor {
         // So just add the markers
         if (empty($this->autoLines)) {
             // Add an empy line above the marker, unless its on the first line or already had one
-            if ($this->startIndex !== 0 && !empty($this->readLines[$this->endIndex])) {
+            if ($this->startIndex !== 0 && ! empty($this->readLines[ $this->endIndex ])) {
                 $this->autoLines[] = PHP_EOL;
             }
             $this->autoLines[] = $this->startMarker;
             $this->autoLines[] = $this->endMarker;
         }
+
         return $this;
     }
 
     /**
      * Set the lines to appear between the makers
      *
-     * @param type $lines
-     * @throws AutoGitIgnoreInvalidParameterException
+     * @param string[] $lines
+     *
      * @return self
+     * @throws AutoGitIgnoreInvalidParameterException
      */
-    public function setLines($lines) {
-        if (!is_array($lines)) {
+    public function setLines($lines)
+    {
+        if (! is_array($lines)) {
             throw new AutoGitIgnoreInvalidParameterException("$lines must be an array. Each value is one line");
         }
         if (current($lines) !== $this->startMarker) {
@@ -149,29 +168,32 @@ class GitIgnoreEditor {
             $lines[] = $this->endMarker;
         }
         $this->autoLines = $lines;
+
         return $this;
     }
 
     /**
      * Save chanes to the .gitinore file
      *
-     * @throws AutoGitIgnoreSaveFailedException
      * @return self
+     * @throws AutoGitIgnoreSaveFailedException|AutoGitIgnorePermissionException
      */
-    public function save() {
+    public function save()
+    {
         $this->CheckGitIgnore();
-        if (!empty($this->beforeLines) && trim(end($this->beforeLines))) {
-            array_push($this->beforeLines, '');
+        if (! empty($this->beforeLines) && trim(end($this->beforeLines))) {
+            $this->beforeLines[] = '';
         }
         if (empty($this->afterLines) || trim(reset($this->afterLines))) {
             array_unshift($this->afterLines, '');
         }
         $this->readLines = array_merge($this->beforeLines, $this->autoLines, $this->afterLines);
         if (count($this->readLines)) {
-            if (!file_put_contents($this->filePath, implode(PHP_EOL, $this->readLines))) {
+            if (! file_put_contents($this->filePath, implode(PHP_EOL, $this->readLines))) {
                 throw new AutoGitIgnoreSaveFailedException("Saving to " . $this->filePath . " failed");
             }
         }
+
         return $this;
     }
 
@@ -179,10 +201,12 @@ class GitIgnoreEditor {
      * Find the index in the readLines array containg the value of $line
      *
      * @param string $line the line to search for
+     *
      * @return int
      */
-    public function findLine($line) {
-        return array_search($line, $this->readLines);
+    public function findLine($line)
+    {
+        return array_search($line, $this->readLines, true);
     }
 
     /**
@@ -190,7 +214,8 @@ class GitIgnoreEditor {
      *
      * @return int
      */
-    public function findStartIndex() {
+    public function findStartIndex()
+    {
         return $this->findLine($this->startMarker);
     }
 
@@ -199,7 +224,8 @@ class GitIgnoreEditor {
      *
      * @return int
      */
-    public function findEndIndex() {
+    public function findEndIndex()
+    {
         return $this->findLine($this->endMarker);
     }
 
@@ -207,7 +233,8 @@ class GitIgnoreEditor {
      * Prints debug info
      * @return self
      */
-    public function debug() {
+    public function debug()
+    {
         echo "filePath    = " . $this->filePath . PHP_EOL;
         echo "startMarker = " . $this->startMarker . PHP_EOL;
         echo "endMarker   = " . $this->endMarker . PHP_EOL;
@@ -217,40 +244,26 @@ class GitIgnoreEditor {
         echo "Start       = " . print_r($this->beforeLines, true);
         echo "Auto      = " . print_r($this->autoLines, true);
         echo "End         = " . print_r($this->afterLines, true);
+
         return $this;
     }
 
     /**
      *
-     * @throws AutoGitIgnorePermissionException
      * @return self
+     * @throws AutoGitIgnorePermissionException
      */
-    protected function CheckGitIgnore() {
-        if (!file_exists($this->filePath)) {
-            if (!is_writable(dirname($this->filePath))) {
+    protected function checkGitIgnore()
+    {
+        if (! file_exists($this->filePath)) {
+            if (! is_writable(dirname($this->filePath))) {
                 throw new AutoGitIgnorePermissionException("Do not have permission to create " . $this->filePath . ". .gitignore does not exist, and unable to create it");
             }
             touch($this->filePath);
-        } elseif (!is_writable($this->filePath)) {
+        } elseif (! is_writable($this->filePath)) {
             throw new AutoGitIgnorePermissionException("Do not have permission to edit " . $this->filePath . ".");
         }
+
         return $this;
     }
-
-}
-
-class AutoGitIgnorePermissionException extends \Exception {
-
-}
-
-class AutoGitIgnoreParseException extends \Exception {
-
-}
-
-class AutoGitIgnoreInvalidParameterException extends \Exception {
-
-}
-
-class AutoGitIgnoreSaveFailedException extends \Exception {
-
 }
